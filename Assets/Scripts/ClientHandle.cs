@@ -65,11 +65,14 @@ public class ClientHandle : MonoBehaviour
     public RoomsHandler roomsHandler; // Gán trong Inspector để cập nhật UI danh sách phòng khi nhận được ROOM_LIST từ server
     public TeamHandler teamHandler; // Gán trong Inspector để cập nhật UI đội khi có người chơi mới vào phòng
     public SelectHeroPanelHandler selectHeroPanelHandler; // Gán trong Inspector để hiển thị bảng chọn tướng khi bắt đầu game
+    public BattleManager battleManager; // Gán trong Inspector để gọi hàm SpawnHeroes khi bắt đầu game
     [UnitHeaderInspectable("Client Information")]
     public int playerId; // Lưu ID người chơi sau khi kết nối
     public int currentRoomId; // Lưu ID phòng hiện tại (nếu có)
     private bool IsHost = false; // Biến để xác định nếu người chơi này là chủ phòng, mặc định là false, server sẽ trả về true nếu người chơi này tạo phòng thành công
-    private bool isInChooseMode = false;
+    public bool isInChooseMode = true;
+    public int teamAHeroID;
+    public int teamBHeroID;
     private void Awake() {
         if (Instance == null)
         {
@@ -80,6 +83,7 @@ public class ClientHandle : MonoBehaviour
         {
             Destroy(gameObject); // Đảm bảo chỉ có một instance tồn tại
         }
+        isInChooseMode = true;
     }
     async void Start()
     {
@@ -188,7 +192,15 @@ public class ClientHandle : MonoBehaviour
 
                 case "VOTE_RESULTS":
                     var voteData = JsonUtility.FromJson<VoteResultsResponse>(jsonString);
-                    OnVoteResultsReceived(voteData.team_a_skill, voteData.team_b_skill);
+                    
+                    if(isInChooseMode){
+                        OnVoteResultsReceived(voteData.team_a_skill, voteData.team_b_skill);
+                    }
+                    else 
+                    {
+                        battleManager?.Fight(voteData.team_a_skill, voteData.team_b_skill);
+                        
+                    }
                     break;
                 case "BACK_TO_LOBBY":
                     var lobbyData = JsonUtility.FromJson<RoomCreatedResponse>(jsonString);
@@ -235,7 +247,6 @@ public class ClientHandle : MonoBehaviour
     }
     private void OnGameStarted()
     {
-        isInChooseMode = true;
         teamHandler.CLoseRoomPanel();
         selectHeroPanelHandler.OpenPanel();
     }
@@ -272,7 +283,6 @@ public class ClientHandle : MonoBehaviour
         }
     }
     public async void StartGame() {
-        isInChooseMode = true;
         selectHeroPanelHandler.OpenPanel();
         var msg = new GameMessage { action = "START", room_id = this.currentRoomId ,player_id = this.playerId}; 
         await websocket.SendText(JsonUtility.ToJson(msg));

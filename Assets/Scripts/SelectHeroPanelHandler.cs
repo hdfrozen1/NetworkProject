@@ -2,17 +2,18 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
-
-
+using UnityEngine.SceneManagement;
+using System.Collections;
 public class SelectHeroPanelHandler : MonoBehaviour
 {
+    public GameObject Root;
     public Button ChooseHeroButton;
-    public List<Toggle> heroToggles; 
-    private int selectedHeroIndex = -1; 
+    public List<Toggle> heroToggles;
+    private int selectedHeroIndex = -1;
     public Image HeroPreviewImageTeamA;
     public Image HeroPreviewImageTeamB;
     public List<Sprite> heroSprites; // Danh sách sprite tương ứng với các hero, gán trong Inspector
-    private void Awake() 
+    private void Awake()
     {
         ChooseHeroButton.interactable = false;
         // Thêm sự kiện Click cho nút chọn
@@ -35,7 +36,7 @@ public class SelectHeroPanelHandler : MonoBehaviour
         for (int i = 0; i < heroToggles.Count; i++)
         {
             int index = i; // Lưu index vào biến cục bộ để tránh lỗi closure trong delegate
-            
+
             // 1. Đặt trạng thái ban đầu là false
             heroToggles[i].isOn = false;
             heroToggles[i].interactable = true;
@@ -43,8 +44,9 @@ public class SelectHeroPanelHandler : MonoBehaviour
             heroToggles[i].GetComponentInChildren<Image>().sprite = heroSprites[i]; // Gán sprite tương ứng cho mỗi Toggle
 
             // 2. Đăng ký sự kiện khi bấm vào Toggle
-            heroToggles[i].onValueChanged.AddListener((bool isOn) => {
-                if (isOn) 
+            heroToggles[i].onValueChanged.AddListener((bool isOn) =>
+            {
+                if (isOn)
                 {
                     OnToggleSelected(index);
                 }
@@ -69,7 +71,7 @@ public class SelectHeroPanelHandler : MonoBehaviour
                 heroToggles[i].SetIsOnWithoutNotify(false);
             }
         }
-        
+
         Debug.Log("Đã chọn Hero index: " + selectedHeroIndex);
     }
 
@@ -77,10 +79,14 @@ public class SelectHeroPanelHandler : MonoBehaviour
     {
         if (selectedHeroIndex != -1)
         {
-            ChooseHeroButton.interactable = false; // Vô hiệu hóa nút sau khi chọn để tránh chọn lại
+            ChooseHeroButton.gameObject.SetActive(false); // Ẩn nút sau khi chọn
             Debug.Log("Đã xác nhận chọn Hero index: " + selectedHeroIndex);
+            for (int i = 0; i < heroToggles.Count; i++)
+            {
+                heroToggles[i].interactable = false; // Vô hiệu hóa tất cả Toggle sau khi chọn
+            }
             ClientHandle.Instance.SendMove(selectedHeroIndex);
-            
+
         }
     }
     public void OpenPanel()
@@ -102,5 +108,17 @@ public class SelectHeroPanelHandler : MonoBehaviour
         HeroPreviewImageTeamB.gameObject.SetActive(true);
         HeroPreviewImageTeamA.sprite = heroSprites[teamASkill]; // Giả sử teamASkill là index của hero đã chọn
         HeroPreviewImageTeamB.sprite = heroSprites[teamBSkill];
+        ClientHandle.Instance.teamAHeroID = teamASkill;
+        ClientHandle.Instance.teamBHeroID = teamBSkill;
+        StartCoroutine(DelayLoadScene("GameScene", 2f));
+    }
+    private IEnumerator DelayLoadScene(string sceneName, float delay)
+    {
+        ClientHandle.Instance.isInChooseMode = false; // Đặt lại trạng thái chọn tướng khi vào trận đấu
+        yield return new WaitForSeconds(delay);
+        SceneManager.LoadScene(sceneName,LoadSceneMode.Additive);
+        ClosePanel();
+        Root.SetActive(false);// Ẩn Root sau khi chọn tướng để tránh hiển thị trong quá trình load scene
+        
     }
 }
